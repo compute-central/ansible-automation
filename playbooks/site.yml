@@ -1,0 +1,21 @@
+---
+# The entry point. Running this converges everything:
+#
+#   ansible-playbook -i inventories/dev playbooks/site.yml --check --diff
+#   ansible-playbook -i inventories/production playbooks/site.yml -e confirm=production
+#
+# It is a list of imports rather than one giant play, so each piece can also be
+# run on its own. `import_playbook` is static: tags and --list-tasks work
+# through it, which they would not with a dynamic include.
+
+- name: Preflight checks
+  ansible.builtin.import_playbook: preflight.yml
+
+- name: Baseline every host
+  ansible.builtin.import_playbook: baseline.yml
+
+- name: Manage service accounts
+  ansible.builtin.import_playbook: users.yml
+
+- name: Deploy the web tier
+  ansible.builtin.import_playbook: webserver.yml

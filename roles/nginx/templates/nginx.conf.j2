@@ -1,0 +1,48 @@
+# {{ ansible_managed }}
+# Rendered by the `nginx` role for {{ inventory_hostname }}.
+# Validated with `nginx -t -c %s` before installation, so this file has already
+# parsed successfully by the time you are reading it on the host.
+
+user {{ 'nginx' if ansible_facts['os_family'] == 'RedHat' else 'www-data' }};
+worker_processes {{ nginx_worker_processes }};
+pid /run/nginx.pid;
+
+error_log /var/log/nginx/error.log warn;
+
+events {
+    worker_connections {{ nginx_worker_connections }};
+    multi_accept on;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" rt=$request_time urt=$upstream_response_time';
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   {{ nginx_keepalive_timeout }};
+    types_hash_max_size 4096;
+    client_max_body_size {{ nginx_client_max_body_size }};
+
+    # Do not advertise the exact nginx version in responses or error pages.
+    server_tokens off;
+
+    gzip            on;
+    gzip_vary       on;
+    gzip_min_length 1024;
+    gzip_types      text/plain text/css application/json application/javascript text/xml application/xml;
+
+{% if nginx_rate_limit_enabled %}
+    # Shared memory zone keyed on client address. Defined here because a
+    # limit_req_zone must live in the http context, not in a server block.
+    limit_req_zone $binary_remote_addr zone={{ nginx_app_name }}_rl:10m rate={{ nginx_rate_limit_rate }};
+    limit_req_status 429;
+{% endif %}
+
+    include /etc/nginx/conf.d/*.conf;
+}

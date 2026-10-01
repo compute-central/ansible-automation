@@ -1,0 +1,28 @@
+---
+env_name: dev
+env_tier: nonprod
+require_confirmation: false
+
+common_timezone: Etc/UTC
+common_ntp_servers:
+  - 0.pool.ntp.org
+
+deploy_canary_batch: 1
+deploy_batch_size: 100%
+# Dev is where a broken play should stop immediately and loudly.
+deploy_max_fail_percentage: 0
+
+nginx_worker_connections: 512
+nginx_keepalive_timeout: 65
+nginx_client_max_body_size: 1m
+nginx_rate_limit_enabled: false
+nginx_access_log_enabled: true
+
+app_name: checkout
+app_port: 8081
+app_upstreams:
+  - 127.0.0.1:9000
+
+# Off in dev so a laptop run does not lock you out of your own box.
+common_harden_ssh: false
+common_firewall_enabled: false

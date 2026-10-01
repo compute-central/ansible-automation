@@ -1,0 +1,13 @@
+---
+- name: Ensure nginx is running and enabled
+  ansible.builtin.service:
+    name: nginx
+    state: "{{ nginx_service_state }}"
+    enabled: "{{ nginx_service_enabled | bool }}"
+  when: not ansible_check_mode
+
+# Handlers normally run at the very end of the play. Flushing them here means
+# the verification tasks that follow test the *reloaded* config rather than
+# whatever was running before this role.
+- name: Flush handlers so verification sees the new configuration
+  ansible.builtin.meta: flush_handlers

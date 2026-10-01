@@ -1,0 +1,67 @@
+---
+# Runs first and touches nothing. Its whole job is to fail fast, before any
+# change is made, if the run is misconfigured.
+#
+# The production guard is the important part. `-e confirm=production` is a
+# deliberate, typed acknowledgement; without it a muscle-memory
+# `ansible-playbook playbooks/site.yml` cannot reach production even if the
+# inventory is pointed there.
+
+- name: Preflight
+  hosts: all
+  gather_facts: true
+  # Facts only -- no escalation needed, so do not ask for it.
+  become: false
+  # Run on every host even if some are unreachable, so one dead box does not
+  # hide the state of the rest.
+  any_errors_fatal: false
+  tags: [always, preflight]
+
+  tasks:
+    - name: Require an explicit confirmation before touching production
+      ansible.builtin.assert:
+        that:
+          - confirm | default('') == env_name
+        fail_msg: >-
+          This inventory is {{ env_name }} and requires explicit confirmation.
+          Re-run with:  -e confirm={{ env_name }}
+        success_msg: "Confirmed: targeting {{ env_name }}"
+        quiet: true
+      when: require_confirmation | default(false) | bool
+      run_once: true
+      delegate_to: localhost
+
+    - name: Report what this run will target
+      ansible.builtin.debug:
+        msg: >-
+          {{ ansible_play_hosts | length }} host(s) in {{ env_name }}:
+          {{ ansible_play_hosts | join(', ') }}
+      run_once: true
+      delegate_to: localhost
+
+    - name: Confirm every host is reachable and has Python
+      ansible.builtin.ping:
+      changed_when: false
+
+    - name: Assert a supported platform and enough disk space
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] in ['RedHat', 'Debian']
+          - ansible_facts['distribution_major_version'] | int >= 9
+            or ansible_facts['os_family'] == 'Debian'
+        fail_msg: >-
+          Unsupported platform: {{ ansible_facts['distribution'] }}
+          {{ ansible_facts['distribution_version'] }}
+        quiet: true
+
+    - name: Warn if the root filesystem is nearly full
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: {{ inventory_hostname }} root filesystem has only
+          {{ (_preflight_root.size_available / 1024 / 1024 / 1024) | round(1) }} GiB free
+      vars:
+        _preflight_root: >-
+          {{ ansible_facts['mounts'] | selectattr('mount', 'equalto', '/') | first | default({'size_available': 0}) }}
+      when:
+        - ansible_facts['mounts'] is defined
+        - (_preflight_root.size_available | default(0) | int) < 2147483648

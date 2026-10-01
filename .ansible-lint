@@ -1,0 +1,32 @@
+---
+# ansible-lint in production profile: the strictest built-in profile, and the
+# one worth holding a repository to. Anything it flags here is something that
+# would eventually bite in a real run.
+profile: production
+
+exclude_paths:
+  - .venv/
+  - collections/
+  - .ansible_cache/
+  - .github/
+
+# Treat warnings as failures in CI. A warning nobody fixes is a warning nobody
+# reads.
+strict: true
+
+# `var-naming[no-role-prefix]` would require every role variable to start with
+# the role name. The roles here follow that convention deliberately, so the
+# rule stays on -- it is what keeps two roles from fighting over `port`.
+
+skip_list: []
+
+warn_list:
+  # Keep experimental rules visible without failing the build on them.
+  - experimental
+
+kinds:
+  - playbook: "playbooks/*.yml"
+  - tasks: "roles/*/tasks/*.yml"
+  - handlers: "roles/*/handlers/*.yml"
+  - vars: "roles/*/{defaults,vars}/*.yml"
+  - meta: "roles/*/meta/main.yml"

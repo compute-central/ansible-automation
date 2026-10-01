@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: app_user
+  author: Sameer Alam
+  description: Manage service accounts and their individual SSH authorized keys.
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: EL
+      versions: ["9", "10"]
+    - name: Debian
+      versions: ["bookworm", "trixie"]
+    - name: Ubuntu
+      versions: ["jammy", "noble"]
+  galaxy_tags: [users, ssh, access]
+
+dependencies: []

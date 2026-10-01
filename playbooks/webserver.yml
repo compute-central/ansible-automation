@@ -1,0 +1,92 @@
+---
+# A rolling deployment in two plays: a canary batch first, then the rest.
+#
+# Why two plays rather than one with `serial: [1, "25%"]`? Because a canary is
+# a decision point, not just a smaller batch. Splitting it means the canary can
+# have its own verification and its own failure policy -- and with
+# `max_fail_percentage: 0` on the canary play, a single bad host stops the run
+# before the remaining hosts are touched at all.
+
+- name: Deploy to the canary host
+  hosts: web
+  become: true
+  gather_facts: true
+  # Only hosts flagged as canaries in the inventory.
+  serial: "{{ deploy_canary_batch | default(1) }}"
+  # Any failure here aborts before the rest of the fleet is touched.
+  max_fail_percentage: 0
+  tags: [web, deploy, canary]
+
+  pre_tasks:
+    - name: Skip hosts that are not the canary
+      ansible.builtin.meta: end_host
+      when: not (deploy_canary | default(false) | bool)
+
+    - name: Announce the canary
+      ansible.builtin.debug:
+        msg: "Canary deployment to {{ inventory_hostname }}"
+
+  roles:
+    - role: nginx
+      vars:
+        nginx_app_name: "{{ app_name }}"
+        nginx_listen_port: "{{ app_port }}"
+        nginx_upstreams: "{{ app_upstreams }}"
+        nginx_worker_connections: "{{ nginx_worker_connections }}"
+        nginx_keepalive_timeout: "{{ nginx_keepalive_timeout }}"
+        nginx_client_max_body_size: "{{ nginx_client_max_body_size }}"
+        nginx_rate_limit_enabled: "{{ nginx_rate_limit_enabled }}"
+        nginx_access_log_enabled: "{{ nginx_access_log_enabled }}"
+
+  post_tasks:
+    - name: Hold the canary under observation before continuing
+      ansible.builtin.pause:
+        seconds: 15
+        prompt: "Canary {{ inventory_hostname }} converged. Checking it stays healthy."
+      when: env_tier | default('nonprod') == 'prod'
+
+    - name: Re-check the canary after the hold
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ app_port }}/healthz"
+        status_code: 200
+        timeout: 10
+      changed_when: false
+      when: not ansible_check_mode
+
+- name: Deploy to the remaining web hosts
+  hosts: web
+  become: true
+  gather_facts: true
+  # Batches, not all at once. With a load balancer in front, this is what keeps
+  # capacity available throughout the rollout.
+  serial: "{{ deploy_batch_size | default('25%') }}"
+  max_fail_percentage: "{{ deploy_max_fail_percentage | default(0) }}"
+  tags: [web, deploy]
+
+  pre_tasks:
+    - name: Skip the canary, which is already done
+      ansible.builtin.meta: end_host
+      when: deploy_canary | default(false) | bool
+
+    # In a real environment this would call out to the load balancer. Leaving
+    # it as a visible placeholder is more honest than pretending it is wired up.
+    - name: Remove the host from the load balancer
+      ansible.builtin.debug:
+        msg: "Would drain {{ inventory_hostname }} from the load balancer here"
+
+  roles:
+    - role: nginx
+      vars:
+        nginx_app_name: "{{ app_name }}"
+        nginx_listen_port: "{{ app_port }}"
+        nginx_upstreams: "{{ app_upstreams }}"
+        nginx_worker_connections: "{{ nginx_worker_connections }}"
+        nginx_keepalive_timeout: "{{ nginx_keepalive_timeout }}"
+        nginx_client_max_body_size: "{{ nginx_client_max_body_size }}"
+        nginx_rate_limit_enabled: "{{ nginx_rate_limit_enabled }}"
+        nginx_access_log_enabled: "{{ nginx_access_log_enabled }}"
+
+  post_tasks:
+    - name: Return the host to the load balancer
+      ansible.builtin.debug:
+        msg: "Would re-add {{ inventory_hostname }} to the load balancer here"

@@ -1,0 +1,14 @@
+---
+# Distribution differences live in vars/, not defaults/, because a caller has
+# no business overriding the name of the SSH service on RHEL.
+#
+# vars/ sits above group_vars in precedence, so anything here is effectively
+# fixed for the role. That is the right home for facts, and the wrong home for
+# anything tunable.
+_common_ssh_service: >-
+  {{ 'sshd' if ansible_facts['os_family'] == 'RedHat' else 'ssh' }}
+
+_common_ntp_service: >-
+  {{ 'chronyd' if ansible_facts['os_family'] == 'RedHat' else 'chrony' }}
+
+_common_ntp_package: chrony

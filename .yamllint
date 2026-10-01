@@ -1,0 +1,35 @@
+---
+# yamllint runs before ansible-lint in CI, because a YAML file that does not
+# parse produces a far more confusing error from Ansible than from yamllint.
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+  # Ansible's own style is `key: value` with two-space indentation and a
+  # leading `-` indented inside its parent.
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  # `yes`/`no` are valid YAML booleans but ambiguous to read. Require the
+  # unambiguous spelling, which is also what ansible-lint prefers.
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: true
+  comments:
+    min-spaces-from-content: 1
+  # ansible-lint requires this off: Ansible's own style indents a comment to
+  # match the block it documents, which this rule would flag.
+  comments-indentation: false
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true   # mode: 0644 must be quoted or use "u=rw,go=r"
+    forbid-explicit-octal: true
+
+ignore: |
+  .venv/
+  collections/
+  .ansible_cache/
+  molecule/*/molecule.yml

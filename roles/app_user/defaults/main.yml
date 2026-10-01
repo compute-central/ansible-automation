@@ -1,0 +1,27 @@
+---
+# Each entry describes one account. Only `name` is required.
+#
+# app_user_accounts:
+#   - name: deploy
+#     comment: "Deployment account"
+#     groups: [sudo]
+#     shell: /bin/bash
+#     ssh_keys:
+#       - "ssh-ed25519 AAAA... deploy@laptop"
+#     sudo_nopasswd_commands:
+#       - /usr/bin/systemctl restart checkout
+#     state: present
+app_user_accounts: []
+
+app_user_default_shell: /bin/bash
+app_user_create_home: true
+
+# `exclusive: true` on authorized_key means the file ends up containing exactly
+# the keys listed here and nothing else. That is what makes offboarding work:
+# removing a key from the list actually removes the access. Set it to false
+# only if humans also add keys by hand, which is a decision to regret later.
+app_user_keys_exclusive: true
+
+# Where per-user sudo rules are written. One file per user, because a single
+# shared file means every change rewrites rules for users you did not touch.
+app_user_sudoers_dir: /etc/sudoers.d

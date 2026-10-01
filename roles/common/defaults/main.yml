@@ -1,0 +1,54 @@
+---
+# Every variable a caller is expected to set lives here, prefixed with the role
+# name. The prefix is not decoration: without it, two roles that both want
+# `port` silently overwrite each other, and the one that wins depends on
+# include order.
+#
+# Defaults are the lowest-precedence source in Ansible, so anything here can be
+# overridden from group_vars, host_vars, or the command line.
+
+common_packages_base:
+  - curl
+  - ca-certificates
+  - rsync
+  - tar
+  - unzip
+
+# Extra packages a caller wants on top of the base set.
+common_packages_extra: []
+
+common_timezone: Etc/UTC
+
+common_manage_ntp: true
+common_ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+
+# --- sysctl -----------------------------------------------------------------
+common_manage_sysctl: true
+common_sysctl_settings:
+  # Reject source-routed packets; they have no legitimate use here.
+  net.ipv4.conf.all.accept_source_route: "0"
+  # Log packets with impossible addresses.
+  net.ipv4.conf.all.log_martians: "1"
+  # Do not act as a router unless something explicitly wants it.
+  net.ipv4.ip_forward: "0"
+  # SYN cookies, for the cheapest possible SYN flood mitigation.
+  net.ipv4.tcp_syncookies: "1"
+  # Expand the ephemeral port range: a busy reverse proxy exhausts the default.
+  net.ipv4.ip_local_port_range: "10240 65535"
+  # Raise the accept queue so bursts queue rather than being refused.
+  net.core.somaxconn: "4096"
+
+# --- SSH hardening ----------------------------------------------------------
+# Off by default. A role that locks down SSH the moment someone includes it
+# will eventually lock someone out of a box they were debugging.
+common_harden_ssh: false
+common_ssh_permit_root_login: "no"
+common_ssh_password_authentication: "no"
+common_ssh_max_auth_tries: 4
+common_ssh_client_alive_interval: 300
+common_ssh_client_alive_count_max: 2
+common_ssh_allow_groups: []
+
+common_firewall_enabled: false

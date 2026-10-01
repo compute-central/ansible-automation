@@ -1,0 +1,54 @@
+---
+# The core of the role. Three things are worth copying from here:
+#
+# 1. `validate: nginx -t -c %s` on the main config. Ansible renders to a temp
+#    file, runs the validation command against it, and only moves it into place
+#    if that command succeeds. A typo never reaches /etc/nginx.
+# 2. Templates notify a handler topic rather than restarting inline, so one
+#    reload happens at the end of the play regardless of how many files changed.
+# 3. The default site is removed explicitly. Leaving it is the single most
+#    common reason "my config isn't being applied" -- it is, but the default
+#    server block is answering first.
+
+- name: Remove the distribution's default site
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/nginx/sites-enabled/default
+    - /etc/nginx/conf.d/default.conf
+  when: nginx_remove_default_site | bool
+  notify: nginx config changed
+
+- name: Deploy the main nginx configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    # `-t` parses the candidate file. Without `-c %s` it would validate the
+    # file already installed, which tells you nothing about the new one.
+    validate: nginx -t -c %s
+  notify: nginx config changed
+
+- name: Deploy the site configuration
+  ansible.builtin.template:
+    src: site.conf.j2
+    dest: "/etc/nginx/conf.d/{{ nginx_app_name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    # A fragment under conf.d cannot be validated on its own -- it has no http
+    # block -- so this one is checked by the full `nginx -t` below instead.
+  notify: nginx config changed
+
+- name: Validate the complete configuration as installed
+  ansible.builtin.command:
+    cmd: nginx -t
+  changed_when: false
+  # Read-only; safe and useful under --check.
+  check_mode: false
+  when: not ansible_check_mode

@@ -1,0 +1,33 @@
+# {{ ansible_managed }}
+# Rendered by the `common` role for {{ inventory_hostname }}.
+#
+# This file is validated with `sshd -t` before it is installed, so a syntax
+# error here fails the playbook rather than the next SSH login.
+
+PermitRootLogin {{ common_ssh_permit_root_login }}
+PasswordAuthentication {{ common_ssh_password_authentication }}
+PubkeyAuthentication yes
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+
+MaxAuthTries {{ common_ssh_max_auth_tries }}
+LoginGraceTime 30
+
+# Drop idle sessions: {{ common_ssh_client_alive_interval }}s x {{ common_ssh_client_alive_count_max }}.
+ClientAliveInterval {{ common_ssh_client_alive_interval }}
+ClientAliveCountMax {{ common_ssh_client_alive_count_max }}
+
+{% if common_ssh_allow_groups | length > 0 %}
+# Only these groups may log in at all.
+AllowGroups {{ common_ssh_allow_groups | join(' ') }}
+{% endif %}
+
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PermitTunnel no
+
+# Modern algorithms only. Anything not listed is refused.
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com

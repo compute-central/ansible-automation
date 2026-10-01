@@ -1,0 +1,84 @@
+---
+# Verification asserts the *outcome*, not that Ansible ran. Checking "did the
+# template task report changed" proves nothing; checking that nginx is
+# listening and the config contains what it should is the actual contract.
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Read the rendered site configuration
+      ansible.builtin.slurp:
+        src: /etc/nginx/conf.d/molecule.conf
+      register: nginx_site_conf
+
+    - name: Decode it
+      ansible.builtin.set_fact:
+        nginx_site_text: "{{ nginx_site_conf.content | b64decode }}"
+
+    - name: The upstream block contains the configured backend
+      ansible.builtin.assert:
+        that:
+          - "'upstream molecule_backend' in nginx_site_text"
+          - "'server 127.0.0.1:9000' in nginx_site_text"
+          - "'keepalive 32;' in nginx_site_text"
+        fail_msg: "The upstream block was not rendered as expected"
+        quiet: true
+
+    - name: Rate limiting was enabled as requested
+      ansible.builtin.assert:
+        that:
+          - "'limit_req zone=molecule_rl' in nginx_site_text"
+        fail_msg: "nginx_rate_limit_enabled was true but no limit_req directive was rendered"
+        quiet: true
+
+    - name: The installed configuration passes nginx's own validation
+      ansible.builtin.command:
+        cmd: nginx -t
+      changed_when: false
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Confirm the service is running and enabled
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['nginx.service'].state == 'running'
+          - ansible_facts.services['nginx.service'].status == 'enabled'
+        fail_msg: >-
+          nginx.service is
+          {{ ansible_facts.services['nginx.service'].state | default('absent') }}
+          / {{ ansible_facts.services['nginx.service'].status | default('unknown') }}
+        quiet: true
+
+    - name: The health endpoint returns 200
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8080/healthz
+        status_code: 200
+        return_content: true
+      register: nginx_health
+
+    - name: And it returns the expected body
+      ansible.builtin.assert:
+        that:
+          - "'ok' in nginx_health.content"
+        quiet: true
+
+    - name: The distribution default site is gone
+      ansible.builtin.stat:
+        path: /etc/nginx/sites-enabled/default
+      register: nginx_default_site
+
+    - name: Confirm it was removed
+      ansible.builtin.assert:
+        that:
+          - not nginx_default_site.stat.exists
+        fail_msg: "The default site is still enabled and will shadow this config"
+        quiet: true
+
+    - name: The server version is not advertised
+      ansible.builtin.assert:
+        that:
+          - "'nginx/' not in (nginx_health.server | default(''))"
+        fail_msg: "server_tokens is not off: {{ nginx_health.server | default('') }}"
+        quiet: true

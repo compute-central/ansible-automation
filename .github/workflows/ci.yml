@@ -1,0 +1,108 @@
+---
+name: CI
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: ansible-galaxy install -r requirements.yml
+
+      # YAML first: a file that does not parse gives a far clearer error from
+      # yamllint than from Ansible.
+      - name: yamllint
+        run: yamllint .
+
+      # The production profile is the strictest ansible-lint ships, and
+      # `strict: true` in .ansible-lint makes warnings fail the build.
+      - name: ansible-lint (production profile)
+        run: ansible-lint
+
+      - name: Syntax-check every playbook
+        run: ansible-playbook --syntax-check -i inventories/dev playbooks/*.yml
+
+      # A missing variable or a typo'd role name in an inventory shows up here
+      # rather than on the first real run.
+      - name: Verify each inventory parses and resolves
+        run: |
+          for env in dev staging production; do
+            echo "--- $env"
+            ansible-inventory -i "inventories/$env" --list > /dev/null
+            ansible-inventory -i "inventories/$env" --graph
+          done
+
+  unit:
+    name: Unit tests (custom module and filters)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: pytest tests/ -q
+
+      # The module's documentation block is part of its interface. If it does
+      # not parse, `ansible-doc` is broken for everyone using the module.
+      - name: Check the custom module's documentation renders
+        run: ansible-doc -M plugins/modules service_health
+
+  check-mode:
+    name: Check mode against a container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: ansible-galaxy install -r requirements.yml
+      # A dry run on the GitHub runner itself: it is a Debian-family host, so
+      # the preflight assertions and the whole templating path are exercised
+      # without needing any infrastructure.
+      - name: Converge localhost in check mode
+        run: |
+          ansible-playbook -i inventories/dev playbooks/preflight.yml --check --diff
+          ansible-playbook -i inventories/dev playbooks/site.yml \
+            --check --diff --tags assert,config
+
+  molecule:
+    name: Molecule (nginx role)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      # Converge, converge again to prove idempotence, then assert the outcome.
+      # The idempotence step is the one that earns its minutes: a role that
+      # reports "changed" twice is a role that restarts a service on every run.
+      - name: molecule test
+        run: molecule test
+        working-directory: roles/nginx
+        env:
+          ANSIBLE_FORCE_COLOR: "1"
+          PY_COLORS: "1"

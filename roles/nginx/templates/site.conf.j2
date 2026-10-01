@@ -1,0 +1,58 @@
+# {{ ansible_managed }}
+# Site configuration for {{ nginx_app_name }} on {{ inventory_hostname }}.
+
+upstream {{ nginx_app_name }}_backend {
+{% for upstream in nginx_upstreams %}
+    server {{ upstream }} max_fails={{ nginx_upstream_max_fails }} fail_timeout={{ nginx_upstream_fail_timeout }};
+{% endfor %}
+    # Keep connections to the backend open so each request does not pay for a
+    # new TCP handshake. Requires proxy_http_version 1.1 and an empty
+    # Connection header below, or it silently does nothing.
+    keepalive {{ nginx_upstream_keepalive }};
+}
+
+server {
+    listen {{ nginx_listen_port }};
+    listen [::]:{{ nginx_listen_port }};
+    server_name {{ nginx_server_name }};
+
+{% if nginx_access_log_enabled %}
+    access_log /var/log/nginx/{{ nginx_app_name }}.access.log main;
+{% else %}
+    access_log off;
+{% endif %}
+    error_log  /var/log/nginx/{{ nginx_app_name }}.error.log warn;
+
+    # Served by nginx itself, so it reports whether *nginx* is healthy. A
+    # health check proxied to the backend tells you about the backend, which is
+    # a different question and a different endpoint.
+    location {{ nginx_health_path }} {
+        access_log off;
+        add_header Content-Type text/plain always;
+        return 200 "ok\n";
+    }
+
+    location / {
+{% if nginx_rate_limit_enabled %}
+        limit_req zone={{ nginx_app_name }}_rl burst={{ nginx_rate_limit_burst }} nodelay;
+{% endif %}
+        proxy_pass http://{{ nginx_app_name }}_backend;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection        "";
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 5s;
+        proxy_send_timeout    30s;
+        proxy_read_timeout    30s;
+
+        # Retry the next upstream on a connection-level failure, but never on a
+        # timeout for a non-idempotent request -- that is how a POST gets
+        # applied twice.
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+        proxy_next_upstream_tries 2;
+    }
+}

@@ -1,0 +1,29 @@
+---
+# Converging is not the same as working. These two checks are the difference
+# between "Ansible reported ok" and "the service actually answers".
+
+- name: Wait for nginx to accept connections
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ nginx_listen_port }}"
+    timeout: 30
+    state: started
+
+- name: Check the health endpoint responds
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ nginx_listen_port }}{{ nginx_health_path }}"
+    status_code: [200]
+    return_content: false
+    timeout: 10
+  register: _nginx_health
+  retries: 6
+  delay: 5
+  until: _nginx_health is succeeded
+  changed_when: false
+
+- name: Report the result
+  ansible.builtin.debug:
+    msg: >-
+      nginx on {{ inventory_hostname }} is serving {{ nginx_app_name }}
+      on port {{ nginx_listen_port }} with
+      {{ nginx_upstreams | length }} upstream(s).

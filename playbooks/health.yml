@@ -1,0 +1,51 @@
+---
+# A read-only playbook. Useful on its own, and useful as the thing a pipeline
+# runs after a deployment to decide whether to roll back.
+#
+#   ansible-playbook -i inventories/production playbooks/health.yml -e confirm=production
+#
+# The custom `service_health` module in plugins/modules does the probing; see
+# that file for how a module reports results without ever shelling out to curl.
+
+- name: Check service health across the fleet
+  hosts: web
+  become: false
+  gather_facts: false
+  # Never report a change: this playbook only looks.
+  tags: [health, verify]
+
+  tasks:
+    - name: Probe the local health endpoint
+      service_health:
+        url: "http://{{ ansible_host | default(inventory_hostname) }}:{{ app_port }}/healthz"
+        expect_status: 200
+        timeout: 5
+        retries: 3
+      register: health
+      # A failing health check is information, not a playbook error. Collect
+      # every host's result, then decide.
+      failed_when: false
+
+    - name: Summarise
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: {{ 'HEALTHY' if health.healthy | default(false) else 'UNHEALTHY' }}
+          ({{ health.status_code | default('no response') }},
+          {{ health.elapsed_ms | default(0) }}ms,
+          {{ health.attempts | default(0) }} attempt(s))
+
+    - name: Fail the run if any host is unhealthy
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts
+            | map('extract', hostvars, ['health', 'healthy'])
+            | select('equalto', false) | list | length == 0
+        fail_msg: >-
+          Unhealthy hosts:
+          {{ ansible_play_hosts
+             | selectattr('health_unhealthy', 'defined')
+             | list | default(ansible_play_hosts) | join(', ') }}
+        success_msg: "All {{ ansible_play_hosts | length }} host(s) healthy"
+        quiet: true
+      run_once: true
+      delegate_to: localhost

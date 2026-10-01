@@ -1,0 +1,22 @@
+---
+# `reloaded`, not `restarted`. A reload re-reads the config and hands new
+# connections to new workers while old workers finish what they are doing, so
+# no in-flight request is dropped. A restart drops every connection.
+#
+# Reload is only safe because the config was validated with `nginx -t` first --
+# see tasks/configure.yml. Reloading a broken config leaves the old workers
+# running and the change silently not applied, which is worse than an error.
+
+- name: Reload nginx
+  listen: nginx config changed
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+  when: not ansible_check_mode
+
+- name: Restart nginx
+  listen: nginx restart required
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+  when: not ansible_check_mode

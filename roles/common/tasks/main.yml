@@ -1,0 +1,33 @@
+---
+# Task files are split by concern and included conditionally, so `--tags ssh`
+# does not pay the cost of the package tasks. `import_tasks` is static and
+# happens at parse time; `include_tasks` is dynamic and happens at run time.
+# Static imports are preferred because tags propagate into them properly.
+
+- name: Assert the role is running on a supported platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] in ['RedHat', 'Debian']
+    fail_msg: >-
+      The common role supports RedHat and Debian families only.
+      This host reports os_family={{ ansible_facts['os_family'] | default('unknown') }}.
+    success_msg: "Platform {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }} is supported"
+  tags: [always, assert]
+
+- name: Install base packages
+  ansible.builtin.import_tasks: packages.yml
+  tags: [packages]
+
+- name: Configure time
+  ansible.builtin.import_tasks: time.yml
+  tags: [time, ntp]
+
+- name: Apply sysctl settings
+  ansible.builtin.import_tasks: sysctl.yml
+  when: common_manage_sysctl | bool
+  tags: [sysctl, hardening]
+
+- name: Harden the ssh daemon
+  ansible.builtin.import_tasks: ssh.yml
+  when: common_harden_ssh | bool
+  tags: [ssh, hardening]

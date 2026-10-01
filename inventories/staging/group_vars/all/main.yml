@@ -1,0 +1,27 @@
+---
+env_name: staging
+env_tier: nonprod
+require_confirmation: false
+
+common_timezone: Etc/UTC
+common_ntp_servers:
+  - 0.pool.ntp.org
+
+deploy_canary_batch: 1
+deploy_batch_size: 50%
+deploy_max_fail_percentage: 0
+
+nginx_worker_connections: 1024
+nginx_keepalive_timeout: 65
+nginx_client_max_body_size: 10m
+nginx_rate_limit_enabled: false
+nginx_access_log_enabled: true
+
+app_name: checkout
+app_port: 8080
+app_upstreams:
+  - staging-app-1.internal:9000
+  - staging-app-2.internal:9000
+
+common_harden_ssh: true
+common_firewall_enabled: true

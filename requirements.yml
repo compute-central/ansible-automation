@@ -1,0 +1,18 @@
+---
+# Galaxy dependencies. Install with:
+#   ansible-galaxy install -r requirements.yml
+#
+# Versions are pinned with `>=` on the minor so that a patch release is picked
+# up but a breaking major is not. A lock file this is not -- for reproducible
+# builds, pin exact versions here and commit the result.
+collections:
+  - name: ansible.posix
+    version: ">=1.6.0"
+  - name: community.general
+    version: ">=10.0.0"
+  - name: community.crypto
+    version: ">=2.22.0"
+  - name: ansible.utils
+    version: ">=5.1.0"
+
+roles: []

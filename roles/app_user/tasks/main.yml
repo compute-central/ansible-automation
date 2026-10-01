@@ -1,0 +1,96 @@
+---
+# Managing users is where "it worked on my machine" turns into a lockout, so
+# this role is deliberately conservative:
+#
+# - sudo rules are validated with `visudo -cf` before installation. An invalid
+#   sudoers file breaks sudo for *everyone* on the host, including you.
+# - keys are exclusive by default, so removing a key removes the access.
+# - removing a user defaults to keeping the home directory. Deleting someone's
+#   data is a separate, explicit decision.
+
+- name: Assert every user entry has a name
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name | length > 0
+    fail_msg: "Every entry in app_user_accounts needs a 'name': {{ item }}"
+    quiet: true
+  loop: "{{ app_user_accounts }}"
+  loop_control:
+    label: "{{ item.name | default('<unnamed>') }}"
+  tags: [always, assert]
+
+- name: Ensure the primary groups exist
+  ansible.builtin.group:
+    name: "{{ item.name }}"
+    state: present
+  loop: "{{ app_user_accounts | selectattr('state', 'defined') | selectattr('state', 'equalto', 'present') | list
+            + app_user_accounts | rejectattr('state', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create the accounts
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    comment: "{{ item.comment | default(omit) }}"
+    group: "{{ item.name }}"
+    # `append: true` adds the supplementary groups without removing the ones
+    # already set. Without it, a run that omits a group silently revokes it.
+    groups: "{{ item.groups | default([]) | join(',') | default(omit, true) }}"
+    append: true
+    shell: "{{ item.shell | default(app_user_default_shell) }}"
+    create_home: "{{ app_user_create_home | bool }}"
+    state: present
+  loop: "{{ app_user_accounts | rejectattr('state', 'defined') | list
+            + app_user_accounts | selectattr('state', 'defined') | selectattr('state', 'equalto', 'present') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install each account's authorized keys
+  ansible.posix.authorized_key:
+    user: "{{ item.0.name }}"
+    key: "{{ item.1 }}"
+    state: present
+    exclusive: "{{ app_user_keys_exclusive | bool }}"
+    manage_dir: true
+  # `subelements` pairs each user with each of their keys. The `skip_missing`
+  # flag means a user with no ssh_keys list is skipped rather than failing.
+  loop: "{{ app_user_accounts | subelements('ssh_keys', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }}: {{ item.1 | truncate(40, true, '...') }}"
+  no_log: false   # public keys are not secrets; seeing them in output helps
+
+- name: Install per-user sudo rules
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "{{ app_user_sudoers_dir }}/60-ansible-{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0440"   # sudo refuses to read a world-writable or group-writable file
+    # The critical safety net. An invalid sudoers file breaks sudo for every
+    # user on the host; `visudo -cf` on the candidate file prevents that from
+    # ever being installed.
+    validate: /usr/sbin/visudo -cf %s
+  loop: "{{ app_user_accounts | selectattr('sudo_nopasswd_commands', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Remove accounts marked absent
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    state: absent
+    # Keeping the home directory is the safe default. Deleting someone's data
+    # is a separate decision, made explicitly per user.
+    remove: "{{ item.remove_home | default(false) | bool }}"
+    force: false
+  loop: "{{ app_user_accounts | selectattr('state', 'defined') | selectattr('state', 'equalto', 'absent') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Remove the sudo rules of absent accounts
+  ansible.builtin.file:
+    path: "{{ app_user_sudoers_dir }}/60-ansible-{{ item.name }}"
+    state: absent
+  loop: "{{ app_user_accounts | selectattr('state', 'defined') | selectattr('state', 'equalto', 'absent') | list }}"
+  loop_control:
+    label: "{{ item.name }}"

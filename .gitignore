@@ -1,0 +1,30 @@
+# Ansible
+*.retry
+.ansible_cache/
+collections/
+roles/*/files/vault_pass
+.vault_pass
+.vault_pass.txt
+
+# Molecule
+.molecule/
+molecule/*/.molecule/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Never commit these
+*.pem
+*.key
+!tests/**/*.pub

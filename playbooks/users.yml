@@ -1,0 +1,30 @@
+---
+- name: Manage service accounts
+  hosts: app
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+
+  vars:
+    app_user_accounts:
+      - name: deploy
+        comment: "Deployment service account"
+        groups: []
+        shell: /bin/bash
+        ssh_keys:
+          # Replace with real public keys, or template them from a variable in
+          # group_vars. Public keys are not secrets and do not need Vault.
+          - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEkey deploy@ci"
+        sudo_nopasswd_commands:
+          # Scoped to exactly what the account needs. Not ALL.
+          - /usr/bin/systemctl reload nginx
+          - /usr/bin/systemctl restart {{ app_name }}
+
+      - name: observability
+        comment: "Metrics scraper, no shell"
+        shell: /usr/sbin/nologin
+        ssh_keys: []
+
+  roles:
+    - role: app_user
+      tags: [users, access]

@@ -1,0 +1,29 @@
+---
+# Fail on bad input at the start of the role, not three tasks into it. An
+# assertion here costs nothing and turns "nginx: [emerg] no servers are inside
+# upstream" on host 14 of 40 into a clear message before anything is touched.
+
+- name: Assert the required variables are set sensibly
+  ansible.builtin.assert:
+    that:
+      - nginx_app_name is string
+      - nginx_app_name | length > 0
+      - nginx_listen_port | int > 0
+      - nginx_listen_port | int < 65536
+      - nginx_upstreams | length > 0
+      - nginx_worker_connections | int > 0
+    fail_msg: >-
+      The nginx role needs nginx_app_name, a valid nginx_listen_port, and at
+      least one entry in nginx_upstreams. Got
+      app_name={{ nginx_app_name | default('<unset>') }},
+      port={{ nginx_listen_port | default('<unset>') }},
+      upstreams={{ nginx_upstreams | default([]) | length }}.
+    quiet: true
+
+- name: Assert every upstream looks like host:port
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9._-]+:[0-9]{1,5}$')
+    fail_msg: "Upstream {{ item | quote }} is not in host:port form"
+    quiet: true
+  loop: "{{ nginx_upstreams }}"

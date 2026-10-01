@@ -1,0 +1,31 @@
+---
+- name: Set the system timezone
+  community.general.timezone:
+    name: "{{ common_timezone }}"
+  notify: ntp config changed
+
+- name: Install the time synchronisation package
+  ansible.builtin.package:
+    name: "{{ _common_ntp_package }}"
+    state: present
+  when: common_manage_ntp | bool
+
+- name: Deploy the chrony configuration
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: "{{ '/etc/chrony.conf' if ansible_facts['os_family'] == 'RedHat' else '/etc/chrony/chrony.conf' }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  when: common_manage_ntp | bool
+  notify: ntp config changed
+
+- name: Ensure time synchronisation is running and enabled
+  ansible.builtin.service:
+    name: "{{ _common_ntp_service }}"
+    state: started
+    enabled: true
+  when:
+    - common_manage_ntp | bool
+    - not ansible_check_mode

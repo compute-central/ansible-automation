@@ -1,0 +1,13 @@
+# Control-node Python dependencies. The managed nodes need nothing but Python
+# and an SSH daemon -- that is the whole point of Ansible.
+#
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+ansible-core>=2.18,<2.20
+ansible-lint>=25.1.0
+yamllint>=1.35.1
+molecule>=25.1.0
+molecule-plugins[docker]>=23.5.3
+jmespath>=1.0.1          # required by the json_query filter
+passlib>=1.7.4           # required by the password_hash filter
+pytest>=8.3.0            # for the custom module's unit tests
+pytest-mock>=3.14.0

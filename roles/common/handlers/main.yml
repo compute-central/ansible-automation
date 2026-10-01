@@ -1,0 +1,28 @@
+---
+# Handlers run once at the end of the play, no matter how many tasks notified
+# them. That is the whole reason to use one instead of restarting a service
+# inside the task that changed its config.
+#
+# `listen` lets several tasks notify a topic rather than a handler name, so a
+# task does not have to know which handler implements the restart.
+
+- name: Restart ssh daemon
+  listen: ssh config changed
+  ansible.builtin.service:
+    name: "{{ _common_ssh_service }}"
+    state: restarted
+  # A broken sshd config plus a restart equals a host you cannot reach. The
+  # validate step on the template task is what makes this safe; this is the
+  # second line of defence.
+  when: not ansible_check_mode
+
+- name: Reload systemd daemon
+  listen: systemd units changed
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Restart time synchronisation
+  listen: ntp config changed
+  ansible.builtin.service:
+    name: "{{ _common_ntp_service }}"
+    state: restarted

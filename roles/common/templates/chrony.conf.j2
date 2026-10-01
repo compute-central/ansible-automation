@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+# Rendered by the `common` role for {{ inventory_hostname }} ({{ env_name | default('unknown') }}).
+# Local edits will be overwritten on the next playbook run.
+
+{% for server in common_ntp_servers %}
+server {{ server }} iburst
+{% endfor %}
+
+# Record the rate at which the clock gains or loses time.
+driftfile /var/lib/chrony/drift
+
+# Step the clock on startup if it is more than 1s out, but only for the first
+# three updates. After that, slew -- a step under a running database is how you
+# get confusing timestamps and expired leases.
+makestep 1.0 3
+
+# Let chrony adjust the real-time clock.
+rtcsync
+
+# Do not act as a time server for anyone else.
+port 0
+cmdport 0
+
+logdir /var/log/chrony

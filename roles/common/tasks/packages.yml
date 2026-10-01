@@ -1,0 +1,27 @@
+---
+# One package task for both families. `ansible.builtin.package` dispatches to
+# dnf or apt based on facts, which is enough here because the package names
+# happen to match. When they do not, the usual pattern is a vars/ file per
+# os_family plus include_vars -- not a `when:` on every task.
+
+- name: Refresh the apt cache if it is stale
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600   # seconds; skips the refresh if it ran recently
+  when: ansible_facts['os_family'] == 'Debian'
+  # A cache refresh changes nothing on the host, so do not report it as a
+  # change. Without this, every run of this role is "changed" forever and the
+  # recap stops meaning anything.
+  changed_when: false
+
+- name: Install base and extra packages
+  ansible.builtin.package:
+    name: "{{ common_packages_base + common_packages_extra }}"
+    state: present
+  # One call with a list, not a loop. A loop here would be one transaction per
+  # package: on a host with twenty packages that is twenty dnf invocations and
+  # roughly twenty times the run time.
+  register: _common_package_install
+  retries: 3
+  delay: 5
+  until: _common_package_install is succeeded

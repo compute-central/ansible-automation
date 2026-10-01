@@ -1,0 +1,17 @@
+---
+# `ansible.posix.sysctl` writes the value to a file *and* applies it live, so
+# the setting survives a reboot. Writing to /etc/sysctl.conf with lineinfile
+# and calling it done is the common mistake: the running kernel keeps the old
+# value until something reloads it.
+
+- name: Apply kernel parameters
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/60-ansible-common.conf
+    sysctl_set: true      # apply now, not just on next boot
+    reload: true
+    state: present
+  loop: "{{ common_sysctl_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}={{ item.value }}"   # keeps the output readable

@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+# Sudo rules for {{ item.name }} on {{ inventory_hostname }}.
+#
+# This file is validated with `visudo -cf` before installation. An invalid
+# sudoers file breaks sudo for every user on the host, so that check is not
+# optional.
+#
+# Rules are scoped to specific commands rather than granting ALL: a service
+# account that needs to restart one unit does not need to become root.
+
+{% for command in item.sudo_nopasswd_commands %}
+{{ item.name }} ALL=(root) NOPASSWD: {{ command }}
+{% endfor %}
+
+# Defaults scoped to this user only.
+Defaults:{{ item.name }} !requiretty
+Defaults:{{ item.name }} env_reset

@@ -1,0 +1,36 @@
+---
+# Environment-wide facts for production. Anything secret belongs in vault.yml
+# next to this file, never here.
+env_name: production
+env_tier: prod
+
+# Nothing in production converges without an explicit confirmation flag. See
+# playbooks/site.yml for the assertion that enforces it.
+require_confirmation: true
+
+common_timezone: Etc/UTC
+common_ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+
+# Rolling deployment shape. `serial` in the play reads these.
+deploy_canary_batch: 1
+deploy_batch_size: 25%
+deploy_max_fail_percentage: 0
+
+nginx_worker_connections: 4096
+nginx_keepalive_timeout: 30
+nginx_client_max_body_size: 10m
+nginx_rate_limit_enabled: true
+nginx_access_log_enabled: true
+
+app_name: checkout
+app_port: 8080
+app_upstreams:
+  - app-1.internal:9000
+  - app-2.internal:9000
+  - app-3.internal:9000
+
+# Hardening is on everywhere, but production is where it must never be off.
+common_harden_ssh: true
+common_firewall_enabled: true

@@ -1,0 +1,40 @@
+---
+# --- what to serve ----------------------------------------------------------
+nginx_app_name: app
+nginx_listen_port: 8080
+nginx_server_name: "{{ inventory_hostname }}"
+
+# Upstream backends. An empty list is a configuration error, and the role
+# asserts rather than rendering an upstream block with no servers -- nginx
+# would refuse to start, and the error it gives is much less clear than ours.
+nginx_upstreams: []
+nginx_upstream_max_fails: 3
+nginx_upstream_fail_timeout: 10s
+nginx_upstream_keepalive: 32
+
+# --- tuning -----------------------------------------------------------------
+nginx_worker_processes: auto
+nginx_worker_connections: 1024
+nginx_keepalive_timeout: 65
+nginx_client_max_body_size: 1m
+
+# --- features ---------------------------------------------------------------
+nginx_access_log_enabled: true
+nginx_rate_limit_enabled: false
+nginx_rate_limit_rate: 20r/s
+nginx_rate_limit_burst: 40
+
+nginx_health_path: /healthz
+
+# --- behaviour --------------------------------------------------------------
+nginx_service_enabled: true
+nginx_service_state: started
+
+# Remove the distribution's default site. Left in place it answers on port 80
+# and quietly shadows the config you just deployed.
+nginx_remove_default_site: true
+
+# Verify the service answers after convergence. Worth the two seconds: it
+# catches the case where nginx starts, binds, and then the app behind it is
+# unreachable.
+nginx_verify_after_converge: true

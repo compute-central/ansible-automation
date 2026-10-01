@@ -1,0 +1,27 @@
+---
+- name: Refresh the apt cache if it is stale
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+  changed_when: false
+
+- name: Install nginx
+  ansible.builtin.package:
+    name: nginx
+    state: present
+  register: _nginx_install
+  retries: 3
+  delay: 5
+  until: _nginx_install is succeeded
+
+- name: Ensure the configuration directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/nginx/conf.d
+    - /var/log/nginx

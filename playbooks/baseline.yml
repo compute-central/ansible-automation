@@ -1,0 +1,13 @@
+---
+- name: Apply the baseline to every host
+  hosts: all
+  become: true
+  gather_facts: true
+  # A baseline that half-applies across a fleet is worse than one that stops:
+  # you no longer know which hosts are in which state. Abort the whole play on
+  # the first failure.
+  any_errors_fatal: true
+
+  roles:
+    - role: common
+      tags: [common, baseline]

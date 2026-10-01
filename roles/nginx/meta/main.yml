@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: nginx
+  author: Sameer Alam
+  description: Install and configure nginx as a reverse proxy, idempotently and safely.
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: EL
+      versions: ["9", "10"]
+    - name: Debian
+      versions: ["bookworm", "trixie"]
+    - name: Ubuntu
+      versions: ["jammy", "noble"]
+  galaxy_tags: [nginx, web, proxy]
+
+dependencies: []

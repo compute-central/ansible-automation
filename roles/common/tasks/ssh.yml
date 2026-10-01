@@ -1,0 +1,47 @@
+---
+# The dangerous role in any baseline. Two properties make it safe to run
+# unattended:
+#
+# 1. `validate` runs `sshd -t` against the candidate file *before* Ansible
+#    moves it into place. A config that would not start is never installed.
+# 2. The restart is a handler, so it fires once at the end of the play and only
+#    if the file actually changed.
+#
+# Writing a drop-in under sshd_config.d rather than editing sshd_config keeps
+# the change reviewable and removable, and survives a package upgrade that
+# replaces the main file.
+
+- name: Check whether this sshd supports drop-in includes
+  ansible.builtin.command:
+    cmd: sshd -T -C user=root,host=localhost,addr=127.0.0.1
+  register: _common_sshd_test
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; it must run even under --check
+
+- name: Ensure the sshd drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the ssh hardening drop-in
+  ansible.builtin.template:
+    src: sshd_hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/50-ansible-hardening.conf
+    owner: root
+    group: root
+    mode: "0600"
+    backup: true
+    # The safety net. `%s` is the candidate file; a non-zero exit aborts the
+    # task and the original file is left untouched.
+    validate: /usr/sbin/sshd -t -f %s
+  notify: ssh config changed
+
+- name: Confirm the ssh daemon is enabled
+  ansible.builtin.service:
+    name: "{{ _common_ssh_service }}"
+    enabled: true
+  when: not ansible_check_mode
