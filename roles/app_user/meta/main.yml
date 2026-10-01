@@ -1,5 +1,6 @@
 ---
 galaxy_info:
+  namespace: compute_central
   role_name: app_user
   author: Sameer Alam
   description: Manage service accounts and their individual SSH authorized keys.

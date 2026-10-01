@@ -1,5 +1,6 @@
 ---
 galaxy_info:
+  namespace: compute_central
   role_name: common
   author: Sameer Alam
   description: Baseline host configuration -- packages, time, sysctl, and SSH hardening.

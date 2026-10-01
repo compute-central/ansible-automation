@@ -29,14 +29,18 @@
   roles:
     - role: nginx
       vars:
+        # Only the variables that need renaming are passed. The group_vars
+        # already define nginx_worker_connections, nginx_keepalive_timeout and
+        # the rest under exactly the role's own names, and group_vars outrank
+        # role defaults, so they reach the role on their own.
+        #
+        # Re-passing them as `nginx_x: "{{ nginx_x }}"` is not just redundant,
+        # it is a recursion: inside the role's scope the right-hand side
+        # resolves to the variable being defined, and Ansible fails with
+        # "Recursive loop detected in template".
         nginx_app_name: "{{ app_name }}"
         nginx_listen_port: "{{ app_port }}"
         nginx_upstreams: "{{ app_upstreams }}"
-        nginx_worker_connections: "{{ nginx_worker_connections }}"
-        nginx_keepalive_timeout: "{{ nginx_keepalive_timeout }}"
-        nginx_client_max_body_size: "{{ nginx_client_max_body_size }}"
-        nginx_rate_limit_enabled: "{{ nginx_rate_limit_enabled }}"
-        nginx_access_log_enabled: "{{ nginx_access_log_enabled }}"
 
   post_tasks:
     - name: Hold the canary under observation before continuing
@@ -77,14 +81,18 @@
   roles:
     - role: nginx
       vars:
+        # Only the variables that need renaming are passed. The group_vars
+        # already define nginx_worker_connections, nginx_keepalive_timeout and
+        # the rest under exactly the role's own names, and group_vars outrank
+        # role defaults, so they reach the role on their own.
+        #
+        # Re-passing them as `nginx_x: "{{ nginx_x }}"` is not just redundant,
+        # it is a recursion: inside the role's scope the right-hand side
+        # resolves to the variable being defined, and Ansible fails with
+        # "Recursive loop detected in template".
         nginx_app_name: "{{ app_name }}"
         nginx_listen_port: "{{ app_port }}"
         nginx_upstreams: "{{ app_upstreams }}"
-        nginx_worker_connections: "{{ nginx_worker_connections }}"
-        nginx_keepalive_timeout: "{{ nginx_keepalive_timeout }}"
-        nginx_client_max_body_size: "{{ nginx_client_max_body_size }}"
-        nginx_rate_limit_enabled: "{{ nginx_rate_limit_enabled }}"
-        nginx_access_log_enabled: "{{ nginx_access_log_enabled }}"
 
   post_tasks:
     - name: Return the host to the load balancer

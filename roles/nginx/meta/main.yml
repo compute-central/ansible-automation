@@ -1,5 +1,6 @@
 ---
 galaxy_info:
+  namespace: compute_central
   role_name: nginx
   author: Sameer Alam
   description: Install and configure nginx as a reverse proxy, idempotently and safely.
