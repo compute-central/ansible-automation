@@ -53,8 +53,12 @@ playbooks/
 roles/
 ├── common/     packages, timezone, chrony, sysctl, SSH hardening
 ├── nginx/      reverse proxy, validated config, reload-not-restart
-│    └── molecule/default/   two distro families, idempotence, real assertions
 └── app_user/   accounts, exclusive authorized_keys, validated sudo drop-ins
+
+molecule/default/            Debian 12 and Rocky 9, converged twice for idempotence
+├── prepare.yml   waits for systemd to boot before facts are gathered
+├── converge.yml  applies the nginx role
+└── verify.yml    asserts outcomes, not that Ansible ran
 
 plugins/
 ├── modules/service_health.py   a custom module, documented and unit tested

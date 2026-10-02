@@ -1,0 +1,85 @@
+---
+# Molecule lives at the project root, not inside the role.
+#
+# A scenario nested in `roles/nginx/molecule/` cannot resolve `nginx` as a
+# role: molecule treats the role directory as the project root, so the
+# repository's own `roles/` is not on the search path. At the root, the
+# `roles_path = roles` from ansible.cfg applies and the role is found.
+#
+#   molecule test        # create, converge, converge again, verify, destroy
+#   molecule converge    # leave the containers up to poke at
+#   molecule login -h nginx-debian
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  # Two distribution families, because the role branches on os_family and a
+  # test against one family does not exercise the other path at all.
+  - name: nginx-debian
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: /lib/systemd/systemd
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+
+  - name: nginx-rocky
+    image: geerlingguy/docker-rockylinux9-ansible:latest
+    command: /usr/lib/systemd/systemd
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      callbacks_enabled: profile_tasks
+      # `stdout_callback: yaml` used to mean community.general.yaml, which was
+      # removed in community.general 12. The built-in default callback with
+      # result_format set needs no collection at all -- which matters because
+      # molecule's create and destroy playbooks run before the dependency
+      # step has installed anything.
+      stdout_callback: default
+      result_format: yaml
+    ssh_connection:
+      # Not applicable to the docker connection plugin.
+      pipelining: false
+  inventory:
+    group_vars:
+      all:
+        nginx_app_name: molecule
+        nginx_listen_port: 8080
+        nginx_upstreams:
+          - 127.0.0.1:9000
+        nginx_rate_limit_enabled: true
+        nginx_verify_after_converge: true
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

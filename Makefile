@@ -54,11 +54,11 @@ facts: $(VENV) ## Dump gathered facts for one host (HOST=...)
 
 .PHONY: molecule
 molecule: $(VENV) ## Full molecule test of the nginx role (needs Docker)
-	cd roles/nginx && ../../$(VENV)/bin/molecule test
+	$(VENV)/bin/molecule test
 
 .PHONY: converge
 converge: $(VENV) ## Molecule converge, leaving the containers up
-	cd roles/nginx && ../../$(VENV)/bin/molecule converge
+	$(VENV)/bin/molecule converge
 
 .PHONY: tags
 tags: $(VENV) ## List every tag available on the main playbook

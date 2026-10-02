@@ -103,7 +103,6 @@ jobs:
       # reports "changed" twice is a role that restarts a service on every run.
       - name: molecule test
         run: molecule test
-        working-directory: roles/nginx
         env:
           ANSIBLE_FORCE_COLOR: "1"
           PY_COLORS: "1"

@@ -1,0 +1,49 @@
+---
+# Runs once after the containers are created and before converge.
+#
+# It exists because of a real race: systemd inside a container takes a moment
+# to finish booting, and until it does, NSS lookups that route through
+# systemd-userdbd can fail. Ansible's own `setup` module hits that path, and
+# the failure surfaces as the thoroughly unhelpful
+#
+#   account management error: Authentication service cannot retrieve
+#   authenticated user
+#
+# which looks like a credentials problem and is actually a boot-order problem.
+#
+# Every task here uses `raw`, so none of them need facts, Python, or a working
+# user lookup -- which is the whole point, since those are what we are waiting
+# for.
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Wait for systemd to finish booting
+      ansible.builtin.raw: |
+        for i in $(seq 1 60); do
+          state=$(systemctl is-system-running 2>/dev/null || true)
+          case "$state" in
+            running|degraded) echo "systemd: $state"; exit 0 ;;
+          esac
+          sleep 1
+        done
+        echo "systemd did not settle: $(systemctl is-system-running 2>/dev/null || echo unknown)"
+        exit 1
+      register: nginx_systemd_state
+      changed_when: false
+
+    - name: Report the systemd state we settled on
+      ansible.builtin.debug:
+        msg: "{{ nginx_systemd_state.stdout | default('') | trim }}"
+
+    # `degraded` is normal in a container: units like systemd-logind or
+    # auditd legitimately fail with no real host behind them. It means
+    # systemd finished booting, which is all we need.
+    - name: Confirm user and group lookups work before facts are gathered
+      ansible.builtin.raw: id root && getent group root
+      changed_when: false
+
+    - name: Make sure Python is present for the modules that follow
+      ansible.builtin.raw: command -v python3 || command -v python
+      changed_when: false
