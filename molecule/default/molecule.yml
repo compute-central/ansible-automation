@@ -46,6 +46,17 @@ platforms:
 
 provisioner:
   name: ansible
+  # Molecule generates its own ansible.cfg in an ephemeral directory and runs
+  # from there, so the repository's ansible.cfg -- and its roles_path, library
+  # and filter_plugins -- never applies. Without these three the role is
+  # searched for in molecule/default/roles and not found.
+  #
+  # ${MOLECULE_PROJECT_DIRECTORY} is expanded by molecule to the directory
+  # containing the molecule/ tree, which is the repository root.
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/roles
+    ANSIBLE_LIBRARY: ${MOLECULE_PROJECT_DIRECTORY}/plugins/modules
+    ANSIBLE_FILTER_PLUGINS: ${MOLECULE_PROJECT_DIRECTORY}/plugins/filter
   config_options:
     defaults:
       callbacks_enabled: profile_tasks
@@ -62,6 +73,15 @@ provisioner:
   inventory:
     group_vars:
       all:
+        # Connect as root. The docker connection plugin otherwise uses the
+        # image's default user, and sudo in the Rocky image demands a password:
+        #   "account management error: Authentication service cannot retrieve
+        #    authentication info / sudo: a password is required"
+        # Ansible skips escalation entirely when the connection user already
+        # equals become_user, so `become: true` in converge.yml stays correct
+        # and simply becomes a no-op here.
+        ansible_user: root
+
         nginx_app_name: molecule
         nginx_listen_port: 8080
         nginx_upstreams:
